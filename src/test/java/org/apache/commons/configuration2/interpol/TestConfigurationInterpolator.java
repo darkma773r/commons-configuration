@@ -22,6 +22,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,6 +31,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.configuration2.FileBasedConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
+import org.apache.commons.configuration2.builder.fluent.Parameters;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -338,6 +344,24 @@ public class TestConfigurationInterpolator {
         final Iterator<String> it = interpolator.prefixSet().iterator();
         it.next();
         it.remove();
+    }
+
+    // TODO: remove
+    @Test
+    public void scratch() throws Exception {
+        Files.write(Paths.get("target/test.properties"), Arrays.asList(
+                "abc = hello",
+                "abc = world",
+                "foo.one = ${abc}",
+                "foo.two = prefix ${abc} suffix"));
+
+        Parameters params = new Parameters();
+        FileBasedConfigurationBuilder<FileBasedConfiguration> builder = new FileBasedConfigurationBuilder<FileBasedConfiguration>(
+                PropertiesConfiguration.class).configure(params.fileBased().setFileName("target/test.properties"));
+
+        FileBasedConfiguration config = builder.getConfiguration();
+        System.out.println(config.getString("foo.one"));
+        System.out.println(config.getString("foo.two"));
     }
 
     /**

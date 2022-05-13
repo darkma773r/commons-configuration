@@ -16,10 +16,12 @@
  */
 package org.apache.commons.configuration2.interpol;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -112,11 +114,14 @@ public class ConfigurationInterpolator {
     /** Stores the default lookup objects. */
     private final List<Lookup> defaultLookups;
 
-    /** Flag determining whether substitution in variable names is enabled. */
-    private boolean enableSubstitutionInVariables;
+    /** The helper object performing variable substitution. */
+    private final StringSubstitutor substitutor;
 
     /** Stores a parent interpolator objects if the interpolator is nested hierarchically. */
     private volatile ConfigurationInterpolator parentInterpolator;
+
+    /** Function used to convert object values to strings. */
+    private volatile Function<Object, String> valueToString = getDefaultValueToString();
 
     /**
      * Creates a new instance of {@code ConfigurationInterpolator}.
@@ -124,6 +129,7 @@ public class ConfigurationInterpolator {
     public ConfigurationInterpolator() {
         prefixLookups = new ConcurrentHashMap<>();
         defaultLookups = new CopyOnWriteArrayList<>();
+        substitutor = initSubstitutor();
     }
 
     /**
@@ -274,6 +280,17 @@ public class ConfigurationInterpolator {
     }
 
     /**
+     * Creates and initializes a {@code StringSubstitutor} object which is used for variable substitution. This
+     * {@code StringSubstitutor} is assigned a specialized lookup object implementing the correct variable resolving
+     * algorithm.
+     *
+     * @return the {@code StringSubstitutor} used by this object
+     */
+    private StringSubstitutor initSubstitutor() {
+        return new StringSubstitutor(key -> valueToString.apply(resolve(key)));
+    }
+
+    /**
      * Performs interpolation of the passed in value. If the value is of type String, this method checks whether it contains
      * variables. If so, all variables are replaced by their current values (if possible). For non string arguments, the
      * value is returned without changes.
@@ -282,10 +299,6 @@ public class ConfigurationInterpolator {
      * @return the interpolated value
      */
     public Object interpolate(final Object value) {
-        return interpolate(value, obj -> Objects.toString(obj, null));
-    }
-
-    public Object interpolate(final Object value, final Function<Object, String> toStringFn) {
         if (value instanceof String) {
             final String strValue = (String) value;
             if (looksLikeSingleVariable(strValue)) {
@@ -298,18 +311,9 @@ public class ConfigurationInterpolator {
                     return resolvedValue;
                 }
             }
-            return createStringSubstitutor(toStringFn).replace(strValue);
+            return substitutor.replace(strValue);
         }
         return value;
-    }
-
-    private StringSubstitutor createStringSubstitutor(final Function<Object, String> toStringFn) {
-        Objects.requireNonNull(toStringFn);
-
-        final StringSubstitutor substitutor = new StringSubstitutor(key -> toStringFn.apply(resolve(key)));
-        substitutor.setEnableSubstitutionInVariables(enableSubstitutionInVariables);
-
-        return substitutor;
     }
 
     /**
@@ -319,7 +323,7 @@ public class ConfigurationInterpolator {
      * @return the substitution in variables flag
      */
     public boolean isEnableSubstitutionInVariables() {
-        return enableSubstitutionInVariables;
+        return substitutor.isEnableSubstitutionInVariables();
     }
 
     /**
@@ -442,7 +446,7 @@ public class ConfigurationInterpolator {
      * @param f the new value of the flag
      */
     public void setEnableSubstitutionInVariables(final boolean f) {
-        this.enableSubstitutionInVariables = f;
+        substitutor.setEnableSubstitutionInVariables(f);
     }
 
     /**
@@ -453,5 +457,34 @@ public class ConfigurationInterpolator {
      */
     public void setParentInterpolator(final ConfigurationInterpolator parentInterpolator) {
         this.parentInterpolator = parentInterpolator;
+    }
+
+    private static Function<Object, String> getDefaultValueToString() {
+        return ConfigurationInterpolator::defaultValueToString;
+    }
+
+    private static String defaultValueToString(final Object obj) {
+        return Objects.toString(extractSimpleValue(obj), null);
+    }
+
+    private static Object extractSimpleValue(final Object obj) {
+        if (obj != null || obj instanceof String) {
+            if (obj instanceof Iterable) {
+               return nextOrNull(((Iterable<?>) obj).iterator());
+            } else if (obj instanceof Iterator) {
+                return nextOrNull((Iterator<?>) obj);
+            } else if (obj.getClass().isArray()) {
+                return Array.getLength(obj) > 0 ?
+                        Array.get(obj, 0) :
+                        null;
+            }
+        }
+        return obj;
+    }
+
+    private static <T> T nextOrNull(final Iterator<T> it) {
+        return it.hasNext() ?
+                it.next() :
+                null;
     }
 }

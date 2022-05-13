@@ -20,7 +20,6 @@ import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Objects;
 
 import org.apache.commons.configuration2.ex.ConversionException;
 import org.apache.commons.configuration2.interpol.ConfigurationInterpolator;
@@ -97,17 +96,6 @@ public class DefaultConversionHandler implements ConversionHandler {
     public <T> T to(final Object src, final Class<T> targetCls, final ConfigurationInterpolator ci) {
         final ConfigurationInterpolator interpolator = fetchInterpolator(ci);
         return convert(interpolator.interpolate(src), targetCls, interpolator);
-    }
-
-    private String interpolationToString(final Object obj) {
-        if (obj != null) {
-            final Object val = isComplexObject(obj) ?
-                    extractConversionValue(obj, String.class, NULL_INTERPOLATOR) :
-                    obj;
-
-            return Objects.toString(val, null);
-        }
-        return null;
     }
 
     /**
