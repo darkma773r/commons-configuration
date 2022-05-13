@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.commons.text.lookup.DefaultStringLookup;
@@ -111,8 +112,8 @@ public class ConfigurationInterpolator {
     /** Stores the default lookup objects. */
     private final List<Lookup> defaultLookups;
 
-    /** The helper object performing variable substitution. */
-    private final StringSubstitutor substitutor;
+    /** Flag determining whether substitution in variable names is enabled. */
+    private boolean enableSubstitutionInVariables;
 
     /** Stores a parent interpolator objects if the interpolator is nested hierarchically. */
     private volatile ConfigurationInterpolator parentInterpolator;
@@ -123,7 +124,6 @@ public class ConfigurationInterpolator {
     public ConfigurationInterpolator() {
         prefixLookups = new ConcurrentHashMap<>();
         defaultLookups = new CopyOnWriteArrayList<>();
-        substitutor = initSubstitutor();
     }
 
     /**
@@ -274,17 +274,6 @@ public class ConfigurationInterpolator {
     }
 
     /**
-     * Creates and initializes a {@code StringSubstitutor} object which is used for variable substitution. This
-     * {@code StringSubstitutor} is assigned a specialized lookup object implementing the correct variable resolving
-     * algorithm.
-     *
-     * @return the {@code StringSubstitutor} used by this object
-     */
-    private StringSubstitutor initSubstitutor() {
-        return new StringSubstitutor(key -> Objects.toString(resolve(key), null));
-    }
-
-    /**
      * Performs interpolation of the passed in value. If the value is of type String, this method checks whether it contains
      * variables. If so, all variables are replaced by their current values (if possible). For non string arguments, the
      * value is returned without changes.
@@ -293,6 +282,10 @@ public class ConfigurationInterpolator {
      * @return the interpolated value
      */
     public Object interpolate(final Object value) {
+        return interpolate(value, obj -> Objects.toString(obj, null));
+    }
+
+    public Object interpolate(final Object value, final Function<Object, String> toStringFn) {
         if (value instanceof String) {
             final String strValue = (String) value;
             if (looksLikeSingleVariable(strValue)) {
@@ -305,9 +298,18 @@ public class ConfigurationInterpolator {
                     return resolvedValue;
                 }
             }
-            return substitutor.replace(strValue);
+            return createStringSubstitutor(toStringFn).replace(strValue);
         }
         return value;
+    }
+
+    private StringSubstitutor createStringSubstitutor(final Function<Object, String> toStringFn) {
+        Objects.requireNonNull(toStringFn);
+
+        final StringSubstitutor substitutor = new StringSubstitutor(key -> toStringFn.apply(resolve(key)));
+        substitutor.setEnableSubstitutionInVariables(enableSubstitutionInVariables);
+
+        return substitutor;
     }
 
     /**
@@ -317,7 +319,7 @@ public class ConfigurationInterpolator {
      * @return the substitution in variables flag
      */
     public boolean isEnableSubstitutionInVariables() {
-        return substitutor.isEnableSubstitutionInVariables();
+        return enableSubstitutionInVariables;
     }
 
     /**
@@ -440,7 +442,7 @@ public class ConfigurationInterpolator {
      * @param f the new value of the flag
      */
     public void setEnableSubstitutionInVariables(final boolean f) {
-        substitutor.setEnableSubstitutionInVariables(f);
+        this.enableSubstitutionInVariables = f;
     }
 
     /**

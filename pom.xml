@@ -548,6 +548,20 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-core</artifactId>
+      <version>${jmh.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-generator-annprocess</artifactId>
+      <version>${jmh.version}</version>
+      <scope>test</scope>
+    </dependency>
+
   </dependencies>
 
   <properties>
@@ -589,6 +603,7 @@
     <commons.javadoc.version>3.3.0</commons.javadoc.version>
     <checkstyle.version>9.3</checkstyle.version>
     <commons.animal-sniffer.version>1.20</commons.animal-sniffer.version>
+    <jmh.version>1.35</jmh.version>
 
     <!-- Commons Release Plugin -->
     <commons.bc.version>2.7</commons.bc.version>
@@ -646,7 +661,7 @@
             <sourceDirectories>
               <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
             </sourceDirectories>
-            <excludes>**/org/apache/commons/configuration2/plist/*.java</excludes>
+            <excludes>**/org/apache/commons/configuration2/plist/*.java,**/generated/**.java,**/jmh_generated/**.java</excludes>
           </configuration>
           <dependencies>
             <dependency>
@@ -829,6 +844,46 @@
       <yourkit.home>/Applications/YourKit_Java_Profiler_8.0.17.app/</yourkit.home>
       </properties>
       </profile> -->
+
+    <profile>
+      <id>benchmark</id>
+      <properties>
+        <skipTests>true</skipTests>
+        <benchmark>org.apache</benchmark>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.0.0</version>
+            <executions>
+              <execution>
+                <id>benchmark</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <classpathScope>test</classpathScope>
+                  <executable>java</executable>
+                  <arguments>
+                    <argument>-classpath</argument>
+                    <classpath/>
+                    <argument>org.openjdk.jmh.Main</argument>
+                    <argument>-rf</argument>
+                    <argument>json</argument>
+                    <argument>-rff</argument>
+                    <argument>target/jmh-result.${benchmark}.json</argument>
+                    <argument>${benchmark}</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
   <reporting>
     <plugins>
