@@ -121,7 +121,7 @@ public class ConfigurationInterpolator {
     private volatile ConfigurationInterpolator parentInterpolator;
 
     /** Function used to convert object values to strings. */
-    private volatile Function<Object, String> valueToString = getDefaultValueToString();
+    private volatile Function<Object, String> valueToString = DefaultValueToString.INSTANCE;
 
     /**
      * Creates a new instance of {@code ConfigurationInterpolator}.
@@ -459,32 +459,50 @@ public class ConfigurationInterpolator {
         this.parentInterpolator = parentInterpolator;
     }
 
-    private static Function<Object, String> getDefaultValueToString() {
-        return ConfigurationInterpolator::defaultValueToString;
-    }
+    /** Class encapsulating the default logic to convert resolved values into strings.
+     * This class is thread-safe.
+     */
+    private static final class DefaultValueToString implements Function<Object, String> {
 
-    private static String defaultValueToString(final Object obj) {
-        return Objects.toString(extractSimpleValue(obj), null);
-    }
+        /** Shared instance. */
+        static final DefaultValueToString INSTANCE = new DefaultValueToString();
 
-    private static Object extractSimpleValue(final Object obj) {
-        if (obj != null || obj instanceof String) {
-            if (obj instanceof Iterable) {
-               return nextOrNull(((Iterable<?>) obj).iterator());
-            } else if (obj instanceof Iterator) {
-                return nextOrNull((Iterator<?>) obj);
-            } else if (obj.getClass().isArray()) {
-                return Array.getLength(obj) > 0 ?
-                        Array.get(obj, 0) :
-                        null;
-            }
+        /** {@inheritDoc} */
+        @Override
+        public String apply(final Object obj) {
+            return Objects.toString(extractSimpleValue(obj), null);
         }
-        return obj;
-    }
 
-    private static <T> T nextOrNull(final Iterator<T> it) {
-        return it.hasNext() ?
-                it.next() :
-                null;
+        /** Attempt to extract a simple value from {@code obj} to use in string conversion.
+         * If the input represents a collection of some sort (e.g., a iterable or array),
+         * the first item is returned.
+         * @param obj input object
+         * @return extracted simple object
+         */
+        private Object extractSimpleValue(final Object obj) {
+            if (!(obj instanceof String) && obj != null) {
+                if (obj instanceof Iterable) {
+                   return nextOrNull(((Iterable<?>) obj).iterator());
+                } else if (obj instanceof Iterator) {
+                    return nextOrNull((Iterator<?>) obj);
+                } else if (obj.getClass().isArray()) {
+                    return Array.getLength(obj) > 0
+                            ? Array.get(obj, 0)
+                            : null;
+                }
+            }
+            return obj;
+        }
+
+        /** Return the next value from {@code it} or {@code null} if no values remain.
+         * @param <T> iterated type
+         * @param it iterator
+         * @return next value from {@code it} or {@code null} if no values remain
+         */
+        private <T> T nextOrNull(final Iterator<T> it) {
+            return it.hasNext()
+                    ? it.next()
+                    : null;
+        }
     }
 }

@@ -22,19 +22,14 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.configuration2.FileBasedConfiguration;
-import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
-import org.apache.commons.configuration2.builder.fluent.Parameters;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -307,6 +302,50 @@ public class TestConfigurationInterpolator {
     }
 
     /**
+     * Tests interpolation with variables containing collections and iterators.
+     */
+    @Test
+    public void testInterpolateStringNonStringVariables() {
+        final String value = "${x} = ${y} is ${result}";
+        interpolator.addDefaultLookup(setUpTestLookup("x", 1));
+        interpolator.addDefaultLookup(setUpTestLookup("y", 2));
+        interpolator.addDefaultLookup(setUpTestLookup("result", false));
+        assertEquals("Wrong result", "1 = 2 is false", interpolator.interpolate(value));
+    }
+
+    /**
+     * Tests interpolation with variables containing collections and iterators.
+     */
+    @Test
+    public void testInterpolateStringCollectionVariables() {
+        final String value = "${single}bc${multi}23${empty}${multiIt}${emptyIt}";
+        final List<Integer> multi = Arrays.asList(1, 0, 0);
+        final List<String> single = Arrays.asList("a");
+        final List<Object> empty = Collections.emptyList();
+        interpolator.addDefaultLookup(setUpTestLookup("multi", multi));
+        interpolator.addDefaultLookup(setUpTestLookup("multiIt", multi.iterator()));
+        interpolator.addDefaultLookup(setUpTestLookup("single", single));
+        interpolator.addDefaultLookup(setUpTestLookup("empty", empty));
+        interpolator.addDefaultLookup(setUpTestLookup("emptyIt", empty.iterator()));
+        assertEquals("Wrong result", "abc123${empty}1${emptyIt}", interpolator.interpolate(value));
+    }
+
+    /**
+     * Tests interpolation with variables containing arrays.
+     */
+    @Test
+    public void testInterpolateStringArrayVariables() {
+        final String value = "${single}bc${multi}23${empty}";
+        final int[] multi = {1, 0, 0};
+        final String[] single = {"a"};
+        final int[] empty = {};
+        interpolator.addDefaultLookup(setUpTestLookup("multi", multi));
+        interpolator.addDefaultLookup(setUpTestLookup("single", single));
+        interpolator.addDefaultLookup(setUpTestLookup("empty", empty));
+        assertEquals("Wrong result", "abc123${empty}", interpolator.interpolate(value));
+    }
+
+    /**
      * Tests a variable declaration which lacks the trailing closing bracket.
      */
     @Test
@@ -344,24 +383,6 @@ public class TestConfigurationInterpolator {
         final Iterator<String> it = interpolator.prefixSet().iterator();
         it.next();
         it.remove();
-    }
-
-    // TODO: remove
-    @Test
-    public void scratch() throws Exception {
-        Files.write(Paths.get("target/test.properties"), Arrays.asList(
-                "abc = hello",
-                "abc = world",
-                "foo.one = ${abc}",
-                "foo.two = prefix ${abc} suffix"));
-
-        Parameters params = new Parameters();
-        FileBasedConfigurationBuilder<FileBasedConfiguration> builder = new FileBasedConfigurationBuilder<FileBasedConfiguration>(
-                PropertiesConfiguration.class).configure(params.fileBased().setFileName("target/test.properties"));
-
-        FileBasedConfiguration config = builder.getConfiguration();
-        System.out.println(config.getString("foo.one"));
-        System.out.println(config.getString("foo.two"));
     }
 
     /**
